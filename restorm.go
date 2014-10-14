@@ -1,32 +1,26 @@
 package restorm
 
 import (
+	"fmt"
+	"reflect"
+	"strconv"
+
 	"github.com/jinzhu/gorm"
-	. "github.com/sergeyt/hypster"
-	. "strconv"
-)
-
-type (
-	// IModel defines interface for models
-	IModel interface {
-		// NewArray creates array of this model
-		NewArray() interface{}
-	}
-
-	// ModelFactory creates new model instance with given primary key
-	ModelFactory func(id int64) IModel
+	"github.com/sergeyt/hypster"
 )
 
 // RegisterHandlers adds HTTP handlers for given collection of models
-func RegisterHandlers(app *AppBuilder, collection string, factory ModelFactory) *AppBuilder {
-	r := app.Route(collection)
-	r.Post(post_model(factory))
-	r.Get(get_models(factory))
+func RegisterHandlers(app *hypster.AppBuilder, collection string, typ reflect.Type) *hypster.AppBuilder {
+	app.
+		Route("/" + collection).
+		Post(postModel(typ)).
+		Get(getModels(typ))
 
-	r = app.Route(collection + "/{id}")
-	r.Get(get_model(factory))
-	r.Update(update_model(factory))
-	r.Delete(delete_model(factory))
+	app.
+		Route("/" + collection + "/{id}").
+		Get(getModel(typ)).
+		Update(updateModel(typ)).
+		Delete(deleteModel(typ))
 
 	return app
 }
@@ -35,39 +29,44 @@ func RegisterHandlers(app *AppBuilder, collection string, factory ModelFactory) 
 // -------------------
 
 // POST /{models}
-func post_model(factory ModelFactory) Handler {
-	return func(ctx *Context) (res interface{}, err error) {
-		model := factory(0)
+func postModel(typ reflect.Type) hypster.Handler {
+	return func(ctx *hypster.Context) (interface{}, error) {
+		db, err := getdb(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		model := create(typ, 0)
 		ctx.Read(model)
 
-		db := get_db(ctx)
 		db.Save(model)
 
 		if err = db.Error; err != nil {
-			return
+			return nil, err
 		}
 
-		// TODO consider to return only issue id
-		res = model
-		return
+		// TODO consider to return only model id
+		return model, nil
 	}
 }
 
 // TODO support basic query
 // GET /{models}
-func get_models(factory ModelFactory) Handler {
-	return func(ctx *Context) (res interface{}, err error) {
-		model := factory(0)
-		models := model.NewArray()
-		db := get_db(ctx)
+func getModels(typ reflect.Type) hypster.Handler {
+	return func(ctx *hypster.Context) (interface{}, error) {
+		db, err := getdb(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		models := reflect.New(reflect.SliceOf(typ))
 		db.Find(models)
 
 		if err = db.Error; err != nil {
-			return
+			return nil, err
 		}
 
-		res = models
-		return
+		return models, nil
 	}
 }
 
@@ -75,73 +74,92 @@ func get_models(factory ModelFactory) Handler {
 // -----------------
 
 // GET /{models}/{id}
-func get_model(factory ModelFactory) Handler {
-	return func(ctx *Context) (res interface{}, err error) {
-		id, err := ParseInt(ctx.Vars["id"], 10, 64)
+func getModel(typ reflect.Type) hypster.Handler {
+	return func(ctx *hypster.Context) (interface{}, error) {
+		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
-			return
+			return nil, err
 		}
 
-		model := factory(0)
-		db := get_db(ctx)
+		db, err := getdb(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		model := create(typ, 0)
 		db.First(model, id)
 
 		if err = db.Error; err != nil {
-			return
+			return nil, err
 		}
 
-		res = model
-		return
+		return model, nil
 	}
 }
 
 // UPDATE /{models}/{id}
-func update_model(factory ModelFactory) Handler {
-	return func(ctx *Context) (res interface{}, err error) {
-		id, err := ParseInt(ctx.Vars["id"], 10, 64)
+func updateModel(typ reflect.Type) hypster.Handler {
+	return func(ctx *hypster.Context) (interface{}, error) {
+		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
-			return
+			return nil, err
 		}
 
-		model := factory(id)
+		db, err := getdb(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		model := create(typ, id)
 		ctx.Read(model)
 
 		// TODO update only fields that are come in JSON input
-		db := get_db(ctx)
 		db.Model(model).Updates(model)
 
 		if err = db.Error; err != nil {
-			return
+			return nil, err
 		}
 
-		res = true
-		return
+		return true, nil
 	}
 }
 
 // DELETE /{models}/{id}
-func delete_model(factory ModelFactory) Handler {
-	return func(ctx *Context) (res interface{}, err error) {
-		id, err := ParseInt(ctx.Vars["id"], 10, 64)
+func deleteModel(typ reflect.Type) hypster.Handler {
+	return func(ctx *hypster.Context) (interface{}, error) {
+		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
-			return
+			return nil, err
 		}
 
-		model := factory(id)
-		db := get_db(ctx)
+		db, err := getdb(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		model := create(typ, id)
 		db.Delete(model)
 
 		if err = db.Error; err != nil {
-			return
+			return nil, err
 		}
 
-		res = true
-		return
+		return true, nil
 	}
 }
 
 // Helpers
 
-func get_db(ctx *Context) *gorm.DB {
-	return ctx.GetService("db").(*gorm.DB)
+func create(typ reflect.Type, id int64) interface{} {
+	val := reflect.New(typ)
+	// set id
+	return val
+}
+
+func getdb(ctx *hypster.Context) (*gorm.DB, error) {
+	db := ctx.GetService("db").(*gorm.DB)
+	if db == nil {
+		return nil, fmt.Errorf(`no "db" service of type gorm.DB`)
+	}
+	return db, nil
 }
