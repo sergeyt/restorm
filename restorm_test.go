@@ -2,7 +2,6 @@ package restorm
 
 import (
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 
@@ -47,7 +46,7 @@ func Test(t *testing.T) {
 			services := make(map[string]interface{})
 			services["db"] = db
 			app := hypster.NewApp(services)
-			RegisterHandlers(app, "users", reflect.TypeOf(&User{}))
+			RegisterHandlers(app, "users", User{})
 
 			ts := httptest.NewServer(app)
 			defer ts.Close()

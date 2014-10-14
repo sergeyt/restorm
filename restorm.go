@@ -10,7 +10,9 @@ import (
 )
 
 // RegisterHandlers adds HTTP handlers for given collection of models
-func RegisterHandlers(app *hypster.AppBuilder, collection string, typ reflect.Type) *hypster.AppBuilder {
+func RegisterHandlers(app *hypster.AppBuilder, collection string, model interface{}) *hypster.AppBuilder {
+	typ := typeOf(model)
+
 	app.
 		Route("/" + collection).
 		Post(postModel(typ)).
@@ -23,6 +25,20 @@ func RegisterHandlers(app *hypster.AppBuilder, collection string, typ reflect.Ty
 		Delete(deleteModel(typ))
 
 	return app
+}
+
+func typeOf(value interface{}) reflect.Type {
+	var t reflect.Type
+	switch value.(type) {
+	case reflect.Type:
+		t = value.(reflect.Type)
+	default:
+		t = reflect.TypeOf(value)
+	}
+	if t.Kind() == reflect.Ptr {
+		return t.Elem()
+	}
+	return t
 }
 
 // Collection handlers
