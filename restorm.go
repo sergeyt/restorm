@@ -4,22 +4,37 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/sergeyt/hypster"
 )
 
 // RegisterHandlers adds HTTP handlers for given collection of models
-func RegisterHandlers(app *hypster.AppBuilder, collection string, model interface{}) *hypster.AppBuilder {
+func RegisterHandlers(app *hypster.AppBuilder, path string, model interface{}) *hypster.AppBuilder {
+	if app == nil {
+		panic("app is nil")
+	}
+	if model == nil {
+		panic("model is nil")
+	}
+
+	if len(path) == 0 {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
 	typ := typeOf(model)
 
 	app.
-		Route("/" + collection).
+		Route(path).
 		Post(postModel(typ)).
 		Get(getModels(typ))
 
 	app.
-		Route("/" + collection + "/{id}").
+		Route(path + "/{id}").
 		Get(getModel(typ)).
 		Update(updateModel(typ)).
 		Delete(deleteModel(typ))
