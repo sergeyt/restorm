@@ -12,6 +12,12 @@ import (
 )
 
 // TODO struct to pass options
+var idField = "ID"
+
+// SetIDField sets name of ID field
+func SetIDField(name string) {
+	idField = name
+}
 
 // RegisterHandlers adds HTTP handlers for given model collection.
 func RegisterHandlers(a *app.App, db *gorm.DB, path string, model interface{}) *app.App {
@@ -174,7 +180,8 @@ func getID(r *http.Request) (int64, error) {
 func create(typ reflect.Type, id int64) interface{} {
 	val := reflect.New(typ)
 	if id != 0 {
-		// TODO fix set ID field
+		field := val.FieldByName(idField)
+		field.SetInt(id)
 	}
 	return val
 }
