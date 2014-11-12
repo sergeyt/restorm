@@ -10,8 +10,8 @@ import (
 	"github.com/sergeyt/hypster"
 )
 
-// RegisterHandlers adds HTTP handlers for given collection of models
-func RegisterHandlers(app *hypster.AppBuilder, path string, model interface{}) *hypster.AppBuilder {
+// ForHypster adds HTTP handlers for given collection of models
+func ForHypster(app *hypster.AppBuilder, path string, model interface{}) *hypster.AppBuilder {
 	if app == nil {
 		panic("app is nil")
 	}
@@ -30,37 +30,23 @@ func RegisterHandlers(app *hypster.AppBuilder, path string, model interface{}) *
 
 	app.
 		Route(path).
-		Post(postModel(typ)).
-		Get(getModels(typ))
+		Post(hypsterPostModel(typ)).
+		Get(hypsterGetModels(typ))
 
 	app.
 		Route(path + "/{id}").
-		Get(getModel(typ)).
-		Update(updateModel(typ)).
-		Delete(deleteModel(typ))
+		Get(hypsterGetModel(typ)).
+		Update(hypsterUpdateModel(typ)).
+		Delete(hypsterDeleteModel(typ))
 
 	return app
-}
-
-func typeOf(value interface{}) reflect.Type {
-	var t reflect.Type
-	switch value.(type) {
-	case reflect.Type:
-		t = value.(reflect.Type)
-	default:
-		t = reflect.TypeOf(value)
-	}
-	if t.Kind() == reflect.Ptr {
-		return t.Elem()
-	}
-	return t
 }
 
 // Collection handlers
 // -------------------
 
 // POST /{models}
-func postModel(typ reflect.Type) hypster.Handler {
+func hypsterPostModel(typ reflect.Type) hypster.Handler {
 	return func(ctx *hypster.Context) (interface{}, error) {
 		db, err := getdb(ctx)
 		if err != nil {
@@ -83,7 +69,7 @@ func postModel(typ reflect.Type) hypster.Handler {
 
 // TODO support basic query
 // GET /{models}
-func getModels(typ reflect.Type) hypster.Handler {
+func hypsterGetModels(typ reflect.Type) hypster.Handler {
 	return func(ctx *hypster.Context) (interface{}, error) {
 		db, err := getdb(ctx)
 		if err != nil {
@@ -105,7 +91,7 @@ func getModels(typ reflect.Type) hypster.Handler {
 // -----------------
 
 // GET /{models}/{id}
-func getModel(typ reflect.Type) hypster.Handler {
+func hypsterGetModel(typ reflect.Type) hypster.Handler {
 	return func(ctx *hypster.Context) (interface{}, error) {
 		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
@@ -129,7 +115,7 @@ func getModel(typ reflect.Type) hypster.Handler {
 }
 
 // UPDATE /{models}/{id}
-func updateModel(typ reflect.Type) hypster.Handler {
+func hypsterUpdateModel(typ reflect.Type) hypster.Handler {
 	return func(ctx *hypster.Context) (interface{}, error) {
 		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
@@ -156,7 +142,7 @@ func updateModel(typ reflect.Type) hypster.Handler {
 }
 
 // DELETE /{models}/{id}
-func deleteModel(typ reflect.Type) hypster.Handler {
+func hypsterDeleteModel(typ reflect.Type) hypster.Handler {
 	return func(ctx *hypster.Context) (interface{}, error) {
 		id, err := strconv.ParseInt(ctx.Vars["id"], 10, 64)
 		if err != nil {
@@ -180,12 +166,6 @@ func deleteModel(typ reflect.Type) hypster.Handler {
 }
 
 // Helpers
-
-func create(typ reflect.Type, id int64) interface{} {
-	val := reflect.New(typ)
-	// set id
-	return val
-}
 
 func getdb(ctx *hypster.Context) (*gorm.DB, error) {
 	db := ctx.GetService("db").(*gorm.DB)

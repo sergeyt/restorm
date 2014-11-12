@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/franela/go-supertest"
+	"github.com/gohttp/app"
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/onsi/gomega"
@@ -41,12 +42,32 @@ func Test(t *testing.T) {
 	}
 
 	describe("with restorm", func() {
-		it("I should easily POST, GET models", func(done Done) {
+		it("I should easily POST, GET models using hypster API", func(done Done) {
 			db := open()
 			services := make(map[string]interface{})
 			services["db"] = db
 			app := hypster.NewApp(services)
-			RegisterHandlers(app, "users", User{})
+			ForHypster(app, "users", User{})
+
+			ts := httptest.NewServer(app)
+			defer ts.Close()
+
+			getUsers := func() {
+				// TODO check body
+				NewRequest(ts.URL).
+					Get("/users").
+					Expect(200, done)
+			}
+
+			NewRequest(ts.URL).
+				Post("/users").
+				Send(&User{Name: "test"}).
+				Expect(200, getUsers)
+		})
+		it("I should easily POST, GET models using gohttp API", func(done Done) {
+			db := open()
+			app := app.New()
+			RegisterHandlers(app, db, "users", User{})
 
 			ts := httptest.NewServer(app)
 			defer ts.Close()
